@@ -1,9 +1,23 @@
 import Foundation
 
+@available(macOS 11, *)
 public class Format {
     public struct Header {
         var recipients: [Stanza] = []
         var mac = Data()
+
+        public func encodeWithoutMAC(to: inout OutputStream) throws {
+            try to.write(Format.intro)
+            for r in self.recipients {
+                try r.encode(to: &to)
+            }
+            try to.write(Format.footerPrefix)
+        }
+
+        public func encode(to: inout OutputStream) throws {
+            try self.encodeWithoutMAC(to: &to)
+            try to.write(self.mac.base64EncodedData())
+        }
     }
 
     public struct Stanza {
@@ -21,6 +35,25 @@ public class Format {
             self.type = s.type
             self.args = s.args
             self.body = s.body
+        }
+
+        public func encode(to: inout OutputStream) throws {
+            try to.write(Format.stanzaPrefix)
+            var args = [self.type]
+            args.append(contentsOf: self.args)
+            for a in args {
+                try to.write(" \(a)")
+            }
+            try to.write("\n")
+            let b64 = self.body.base64EncodedData(options: [.lineLength64Characters, .endLineWithLineFeed])
+            try to.write(b64)
+            // The format is a little finicky and requires some short lines.
+            // When the input is divisible by bytesPerLine the encoder won't have
+            // added the final newline the format expects.
+            if self.body.count > 0 && self.body.count % Format.bytesPerLine == 0 {
+                try to.write("\n")
+            }
+            try to.write("\n")
         }
     }
 
@@ -43,8 +76,8 @@ public class Format {
         throw Base64DecodeError()
     }
 
-    static let columsPerLine = 64
-    static var bytesPerLine: Int { columsPerLine / 4 * 3 }
+    static let columnsPerLine = 64
+    static var bytesPerLine: Int { columnsPerLine / 4 * 3 }
 
     enum StanzaError: Error {
         case LineError, MalformedOpeningLine, MalformedStanza, MalformedBodyLineSize
