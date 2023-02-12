@@ -1,4 +1,5 @@
 import Foundation
+import NIOCore
 
 @available(macOS 11, *)
 public class Format {
@@ -83,77 +84,90 @@ public class Format {
         case LineError, MalformedOpeningLine, MalformedStanza, MalformedBodyLineSize
     }
 
-    static let intro = "age-encryption.org/v1\n".data(using: .utf8)!
+    static let intro = "age-encryption.org/v1\n"
 
     static let stanzaPrefix = "->".data(using: .utf8)!
     static let footerPrefix = "---".data(using: .utf8)!
 
-    public static func readStanza(input: InputStream) throws -> Stanza {
-        var s = Stanza()
+    struct StanzaReader {
+        var buf: ByteBuffer
 
-        guard let line = try input.readLine() else {
-            throw StanzaError.LineError
+        init(_ buf: ByteBuffer) {
+            self.buf = buf
         }
-        if !line.starts(with: stanzaPrefix) {
-            throw StanzaError.MalformedOpeningLine
-        }
-        let (prefix, args) = splitArgs(line: line)
-        if prefix != String(data: stanzaPrefix, encoding: .utf8)! || args.count < 1 {
-            throw StanzaError.MalformedStanza
-        }
-        for a in args {
-            if !isValidString(a) {
-                throw StanzaError.MalformedStanza
-            }
-        }
-        s.type = args[0]
-        s.args = Array(args[1...])
 
-        while true {
-            guard let line = try input.readLine() else {
+        public mutating func readStanza() throws -> Stanza {
+            var s = Stanza()
+
+            guard let line = buf.readBytes(until: "\n") else {
                 throw StanzaError.LineError
             }
-
-            var lineStr = String(data: line, encoding: .utf8)!
-            lineStr = lineStr.trimmingCharacters(in: ["\n"])
-            let b: Data
-            do {
-                b = try decodeString(lineStr)
-
-                if b.count > bytesPerLine {
-                    throw StanzaError.MalformedBodyLineSize
+            if !line.starts(with: stanzaPrefix) {
+                throw StanzaError.MalformedOpeningLine
+            }
+            let (prefix, args) = splitArgs(line: line)
+            if prefix != String(data: stanzaPrefix, encoding: .utf8)! || args.count < 1 {
+                throw StanzaError.MalformedStanza
+            }
+            for a in args {
+                if !isValidString(a) {
+                    throw StanzaError.MalformedStanza
                 }
-                s.body.append(b)
-                if b.count < bytesPerLine {
-                    return s
+            }
+            s.type = args[0]
+            s.args = Array(args[1...])
+
+            while true {
+                guard let line = buf.readBytes(until: "\n") else {
+                    throw StanzaError.LineError
                 }
-            } catch {
-                // TODO: The Go implementation checks the value for the footerPrefix and stanzaPrefix
+
+                var lineStr = String(bytes: line, encoding: .utf8)!
+                lineStr = lineStr.trimmingCharacters(in: ["\n"])
+                let b: Data
+                do {
+                    b = try decodeString(lineStr)
+                    if b.count > bytesPerLine {
+                        throw StanzaError.MalformedBodyLineSize
+                    }
+                    s.body.append(b)
+                    if b.count < bytesPerLine {
+                        return s
+                    }
+                } catch {
+                    // TODO: The Go implementation checks the value for the footerPrefix and stanzaPrefix
+                }
             }
         }
     }
 
     enum ParseError: Error {
         case IntroRead, UnexpectedIntro, ReadHeader, MalformedClosingLine
+        case internalError
     }
 
     public static func parse(input: InputStream) throws -> (Header, InputStream) {
         var h = Header()
+        // Consume the entire input
+        // FIXME: We shouldn't do this and should read chunks at a time
+        var buf = ByteBuffer(input)
 
-        guard let line = try input.readLine() else {
+        guard let line = buf.readString(until: "\n") else {
             throw ParseError.IntroRead
         }
         if line != Format.intro {
             throw ParseError.UnexpectedIntro
         }
 
-        let bufSize = 4096 // equal to Go's bufio.NewReader defaultBufSize
-        var buffer = Data(capacity: bufSize)
-        while input.read(&buffer, maxLength: bufSize) > 0 {
-            if buffer[...footerPrefix.count] == footerPrefix {
-                guard let line = buffer.readLine() else {
+        while true {
+            guard let peek = buf.getBytes(at: buf.readerIndex, length: footerPrefix.count) else {
+                throw ParseError.ReadHeader
+            }
+            if peek == Array(footerPrefix) {
+                guard let line = buf.readBytes(until: "\n") else {
                     throw ParseError.ReadHeader
                 }
+
                 let (prefix, args) = splitArgs(line: line)
                 if prefix != String(data: footerPrefix, encoding: .utf8)! || args.count != 1 {
                     throw ParseError.MalformedClosingLine
@@ -165,17 +179,24 @@ public class Format {
                 break
             }
 
-            let s = try readStanza(input: input)
+            var sr = StanzaReader(buf)
+            let s = try sr.readStanza()
+            buf = sr.buf // read buf back to get the position advances
             h.recipients.append(s)
         }
 
-        return (h, input)
+        guard let buf = buf.getBytes(at: buf.readerIndex, length: buf.readableBytes) else {
+            throw ParseError.internalError
+        }
+        let payload = InputStream(data: Data(buf))
+        payload.open()
+        return (h, payload)
     }
 
-    private static func splitArgs(line: Data) -> (String, [String]) {
-        var s = String(data: line, encoding: .utf8)!
+    private static func splitArgs<Bytes>(line: Bytes) -> (String, [String]) where Bytes: Sequence, Bytes.Element == UInt8 {
+        var s = String(bytes: line, encoding: .utf8)!
         s = s.trimmingCharacters(in: ["\n"])
-        let parts = s.components(separatedBy: "\n")
+        let parts = s.components(separatedBy: " ")
         return (parts[0], Array(parts[1...]))
     }
 
