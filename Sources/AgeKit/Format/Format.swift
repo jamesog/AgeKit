@@ -58,30 +58,31 @@ public class Format {
         }
     }
 
-    struct UnexpectedNewLineError: Error {}
-    struct Base64DecodeError: Error {}
+    enum DecodeError: Error {
+        case unexpectedNewLineError, base64DecodeError
+    }
 
     public static func decodeString(_ s: String) throws -> Data {
         if #available(macOS 13.0, *) {
             if s.contains(["\n", "\r"]) {
-                throw UnexpectedNewLineError()
+                throw DecodeError.unexpectedNewLineError
             }
         } else {
             if s.contains("\n") || s.contains("\r") {
-                throw UnexpectedNewLineError()
+                throw DecodeError.unexpectedNewLineError
             }
         }
         if let b64 = Data(base64Encoded: s) {
             return b64
         }
-        throw Base64DecodeError()
+        throw DecodeError.base64DecodeError
     }
 
     static let columnsPerLine = 64
     static var bytesPerLine: Int { columnsPerLine / 4 * 3 }
 
     enum StanzaError: Error {
-        case LineError, MalformedOpeningLine, MalformedStanza, MalformedBodyLineSize
+        case lineError, malformedOpeningLine, malformedStanza, malformedBodyLineSize
     }
 
     static let intro = "age-encryption.org/v1\n"
@@ -97,29 +98,27 @@ public class Format {
         }
 
         public mutating func readStanza() throws -> Stanza {
-            var s = Stanza()
+            var stanza = Stanza()
 
             guard let line = buf.readBytes(until: "\n") else {
-                throw StanzaError.LineError
+                throw StanzaError.lineError
             }
             if !line.starts(with: stanzaPrefix) {
-                throw StanzaError.MalformedOpeningLine
+                throw StanzaError.malformedOpeningLine
             }
             let (prefix, args) = splitArgs(line: line)
             if prefix != String(data: stanzaPrefix, encoding: .utf8)! || args.count < 1 {
-                throw StanzaError.MalformedStanza
+                throw StanzaError.malformedStanza
             }
-            for a in args {
-                if !isValidString(a) {
-                    throw StanzaError.MalformedStanza
-                }
+            for arg in args where !isValidString(arg) {
+                throw StanzaError.malformedStanza
             }
-            s.type = args[0]
-            s.args = Array(args[1...])
+            stanza.type = args[0]
+            stanza.args = Array(args[1...])
 
             while true {
                 guard let line = buf.readBytes(until: "\n") else {
-                    throw StanzaError.LineError
+                    throw StanzaError.lineError
                 }
 
                 var lineStr = String(bytes: line, encoding: .utf8)!
@@ -128,11 +127,11 @@ public class Format {
                 do {
                     b = try decodeString(lineStr)
                     if b.count > bytesPerLine {
-                        throw StanzaError.MalformedBodyLineSize
+                        throw StanzaError.malformedBodyLineSize
                     }
-                    s.body.append(b)
+                    stanza.body.append(b)
                     if b.count < bytesPerLine {
-                        return s
+                        return stanza
                     }
                 } catch {
                     // TODO: The Go implementation checks the value for the footerPrefix and stanzaPrefix
@@ -142,39 +141,39 @@ public class Format {
     }
 
     enum ParseError: Error {
-        case IntroRead, UnexpectedIntro, ReadHeader, MalformedClosingLine
+        case introRead, unexpectedIntro, readHeader, malformedClosingLine
         case internalError
     }
 
     public static func parse(input: InputStream) throws -> (Header, InputStream) {
-        var h = Header()
+        var header = Header()
         // Consume the entire input
         // FIXME: We shouldn't do this and should read chunks at a time
         var buf = ByteBuffer(input)
 
         guard let line = buf.readString(until: "\n") else {
-            throw ParseError.IntroRead
+            throw ParseError.introRead
         }
         if line != Format.intro {
-            throw ParseError.UnexpectedIntro
+            throw ParseError.unexpectedIntro
         }
 
         while true {
             guard let peek = buf.getBytes(at: buf.readerIndex, length: footerPrefix.count) else {
-                throw ParseError.ReadHeader
+                throw ParseError.readHeader
             }
             if peek == Array(footerPrefix) {
                 guard let line = buf.readBytes(until: "\n") else {
-                    throw ParseError.ReadHeader
+                    throw ParseError.readHeader
                 }
 
                 let (prefix, args) = splitArgs(line: line)
                 if prefix != String(data: footerPrefix, encoding: .utf8)! || args.count != 1 {
-                    throw ParseError.MalformedClosingLine
+                    throw ParseError.malformedClosingLine
                 }
-                h.mac = try decodeString(args[0])
-                if h.mac.count != 32 {
-                    throw ParseError.MalformedClosingLine
+                header.mac = try decodeString(args[0])
+                if header.mac.count != 32 {
+                    throw ParseError.malformedClosingLine
                 }
                 break
             }
@@ -182,7 +181,7 @@ public class Format {
             var sr = StanzaReader(buf)
             let s = try sr.readStanza()
             buf = sr.buf // read buf back to get the position advances
-            h.recipients.append(s)
+            header.recipients.append(s)
         }
 
         guard let buf = buf.getBytes(at: buf.readerIndex, length: buf.readableBytes) else {
@@ -190,10 +189,12 @@ public class Format {
         }
         let payload = InputStream(data: Data(buf))
         payload.open()
-        return (h, payload)
+        return (header, payload)
     }
 
-    private static func splitArgs<Bytes>(line: Bytes) -> (String, [String]) where Bytes: Sequence, Bytes.Element == UInt8 {
+    private static func splitArgs<Bytes>(line: Bytes) -> (String, [String])
+        where Bytes: Sequence, Bytes.Element == UInt8 {
+
         var s = String(bytes: line, encoding: .utf8)!
         s = s.trimmingCharacters(in: ["\n"])
         let parts = s.components(separatedBy: " ")
@@ -213,5 +214,3 @@ public class Format {
         return true
     }
 }
-
-
