@@ -1,0 +1,13 @@
+import XCTest
+@testable import AgeKit
+
+class StreamTests: XCTestCase {
+% for step in [512, 600, 1000, "chunkSize"]:
+  % for length in [0, 1000, "chunkSize", "chunkSize+100"]:
+    % length_name = length.replace("+", "Plus") if isinstance(length, str) else length
+    func testRoundTrip_Length_${length_name}_Step_${step}() throws {
+        try roundTrip(stepSize: ${step}, length: ${length})
+    }
+  % end
+% end
+}
