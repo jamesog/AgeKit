@@ -10,12 +10,12 @@ final class FormatTests: XCTestCase {
 
         let expect = "-> test 1 2 3\n\n"
 
-        var buf = [UInt8](repeating: 0, count: expect.count)
-        var out = OutputStream(toBuffer: &buf, capacity: expect.count)
+        var out = OutputStream.toMemory()
         out.open()
-        XCTAssertNoThrow(try s.encode(to: &out))
+        try s.encode(to: &out)
         out.close()
         XCTAssertNil(out.streamError)
+        let buf = out.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
         let str = String(bytes: buf, encoding: .utf8)!
         XCTAssertEqual(str, expect, "wrong empty stanza encoding")
     }
@@ -28,12 +28,12 @@ final class FormatTests: XCTestCase {
 
         let expect = "-> test 1 2 3\nQUFB\n"
 
-        var buf = [UInt8](repeating: 0, count: expect.count)
-        var out = OutputStream(toBuffer: &buf, capacity: expect.count)
+        var out = OutputStream.toMemory()
         out.open()
-        XCTAssertNoThrow(try s.encode(to: &out))
+        _ = try s.encode(to: &out)
         out.close()
         XCTAssertNil(out.streamError)
+        let buf = out.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
         let str = String(bytes: buf, encoding: .utf8)!
         XCTAssertEqual(str, expect, "wrong normal stanza encoding")
     }
@@ -46,12 +46,12 @@ final class FormatTests: XCTestCase {
 
         let expect = "-> test 1 2 3\nQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB\n\n"
 
-        var buf = [UInt8](repeating: 0, count: expect.count)
-        var out = OutputStream(toBuffer: &buf, capacity: expect.count)
+        var out = OutputStream.toMemory()
         out.open()
-        XCTAssertNoThrow(try s.encode(to: &out))
+        _ = try s.encode(to: &out)
         out.close()
         XCTAssertNil(out.streamError)
+        let buf = out.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
         let str = String(bytes: buf, encoding: .utf8)!
         XCTAssertEqual(str, expect, "wrong 64 columns stanza encoding")
     }
