@@ -1,25 +1,53 @@
+import CryptoKit
+import ExtrasBase64
 import Foundation
 import NIOCore
 
-@available(macOS 11, *)
-public class Format {
+public enum Format {
+    static let intro = "age-encryption.org/v1\n"
+
+    static let stanzaPrefix = "->".data(using: .utf8)!
+    static let footerPrefix = "---".data(using: .utf8)!
+}
+
+// MARK: - Header
+
+extension Format {
     public struct Header {
         var recipients: [Stanza] = []
         var mac = Data()
 
-        public func encodeWithoutMAC(to: inout OutputStream) throws {
-            try to.write(Format.intro)
+        public func encodeWithoutMAC<H: HashFunction>(to hash: inout HMAC<H>) {
+            hash.update(data: Format.intro.data(using: .utf8)!)
             for r in self.recipients {
-                try r.encode(to: &to)
+                hash.update(data: r.encode())
             }
-            try to.write(Format.footerPrefix)
+            hash.update(data: Format.footerPrefix)
         }
 
-        public func encode(to: inout OutputStream) throws {
-            try self.encodeWithoutMAC(to: &to)
-            try to.write(self.mac.base64EncodedData())
+        public func encodeWithoutMAC(to output: inout OutputStream) throws {
+            _ = try output.write(Format.intro.data(using: .utf8)!)
+            for r in self.recipients {
+                try r.encode(to: &output)
+            }
+            _ = try output.write(Format.footerPrefix)
+        }
+
+        public func encode(to output: inout OutputStream) throws {
+            try self.encodeWithoutMAC(to: &output)
+            _ = try output.write(" ".data(using: .utf8)!)
+            let b64 = Base64.encodeString(bytes: self.mac, options: .omitPaddingCharacter)
+            _ = try output.write(b64)
+            _ = try output.write("\n".data(using: .utf8)!)
         }
     }
+}
+
+// MARK: - Stanza
+
+extension Format {
+    static let columnsPerLine = 64
+    static var bytesPerLine: Int { columnsPerLine / 4 * 3 }
 
     public struct Stanza {
         var type: String
@@ -38,28 +66,37 @@ public class Format {
             self.body = s.body
         }
 
+        public func encode() -> Data {
+            var out = OutputStream.toMemory()
+            out.open()
+            try! encode(to: &out)
+            out.close()
+            return out.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
+        }
+
         public func encode(to: inout OutputStream) throws {
-            try to.write(Format.stanzaPrefix)
-            var args = [self.type]
+            var stanza = String(data: Format.stanzaPrefix, encoding: .utf8)!
+            var args = [type]
             args.append(contentsOf: self.args)
             for a in args {
-                try to.write(" \(a)")
+                stanza.append(" \(a)")
             }
-            try to.write("\n")
-            let b64 = self.body.base64EncodedData(options: [.lineLength64Characters, .endLineWithLineFeed])
-            try to.write(b64)
+            stanza.append("\n")
+            let b64 = Base64.encodeString(bytes: body, options: .omitPaddingCharacter)
+            stanza.append(b64)
             // The format is a little finicky and requires some short lines.
             // When the input is divisible by bytesPerLine the encoder won't have
             // added the final newline the format expects.
             if self.body.count > 0 && self.body.count % Format.bytesPerLine == 0 {
-                try to.write("\n")
+                stanza.append("\n")
             }
-            try to.write("\n")
+            stanza.append("\n")
+            _ = try to.write(stanza.data(using: .utf8)!)
         }
     }
 
     enum DecodeError: Error {
-        case unexpectedNewLineError, base64DecodeError
+        case unexpectedNewLineError
     }
 
     public static func decodeString(_ s: String) throws -> Data {
@@ -72,23 +109,16 @@ public class Format {
                 throw DecodeError.unexpectedNewLineError
             }
         }
-        if let b64 = Data(base64Encoded: s) {
-            return b64
-        }
-        throw DecodeError.base64DecodeError
+        let b64 = try Base64.decode(string: s, options: .omitPaddingCharacter)
+        return Data(b64)
     }
-
-    static let columnsPerLine = 64
-    static var bytesPerLine: Int { columnsPerLine / 4 * 3 }
 
     enum StanzaError: Error {
-        case lineError, malformedOpeningLine, malformedStanza, malformedBodyLineSize
+        case lineError
+        case malformedOpeningLine
+        case malformedStanza
+        case malformedBodyLineSize
     }
-
-    static let intro = "age-encryption.org/v1\n"
-
-    static let stanzaPrefix = "->".data(using: .utf8)!
-    static let footerPrefix = "---".data(using: .utf8)!
 
     struct StanzaReader {
         var buf: ByteBuffer
@@ -103,11 +133,11 @@ public class Format {
             guard let line = buf.readBytes(until: "\n") else {
                 throw StanzaError.lineError
             }
-            if !line.starts(with: stanzaPrefix) {
+            guard line.starts(with: stanzaPrefix) else {
                 throw StanzaError.malformedOpeningLine
             }
             let (prefix, args) = splitArgs(line: line)
-            if prefix != String(data: stanzaPrefix, encoding: .utf8)! || args.count < 1 {
+            guard prefix.bytes == stanzaPrefix.bytes && args.count >= 1 else {
                 throw StanzaError.malformedStanza
             }
             for arg in args where !isValidString(arg) {
@@ -141,7 +171,10 @@ public class Format {
     }
 
     enum ParseError: Error {
-        case introRead, unexpectedIntro, readHeader, malformedClosingLine
+        case introRead
+        case unexpectedIntro
+        case readHeader
+        case malformedClosingLine
         case internalError
     }
 
@@ -154,7 +187,7 @@ public class Format {
         guard let line = buf.readString(until: "\n") else {
             throw ParseError.introRead
         }
-        if line != Format.intro {
+        guard line == Format.intro else {
             throw ParseError.unexpectedIntro
         }
 
