@@ -1,20 +1,23 @@
 import Foundation
 
 extension OutputStream {
-    func write(_ s: String) throws {
+    func write(_ s: String) throws -> Int {
+        if s.isEmpty { return 0 }
         let bytes = [UInt8](s.utf8)
-        write(bytes, maxLength: bytes.count)
+        let ret = write(bytes, maxLength: bytes.count)
         if let streamError = streamError {
             throw streamError
         }
+        return ret
     }
 
-    func write(_ d: Data) throws {
-        if d.isEmpty { return }
+    func write(_ d: Data) throws -> Int {
+        if d.isEmpty { return 0 }
         let buf: [UInt8] = Array(d)
-        write(buf, maxLength: buf.count)
+        let ret = write(buf, maxLength: buf.count)
         if let streamError = streamError {
             throw streamError
         }
+        return ret
     }
 }
