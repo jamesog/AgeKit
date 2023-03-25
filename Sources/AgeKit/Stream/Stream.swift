@@ -90,7 +90,7 @@ public struct StreamReader {
         self.encryptedChunk = Data(buf[..<n])
         // The last chunk can be short, but not empty unless it's the first and only chunk.
         if n < encChunkSize {
-            if !self.nonce.isZero() && n == chaChaPolyOverhead {
+            if !self.nonce.isZero() && n == ChaChaPoly.overhead {
                 throw StreamError.lastChunkEmpty
             }
             self.nonce.setLastChunkFlag()
