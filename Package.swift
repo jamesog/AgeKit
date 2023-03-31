@@ -19,6 +19,8 @@ let package = Package(
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-extras/swift-extras-base64.git", from: "0.7.0"),
+        // TODO: Change this to a version once they've tagged a release which includes 155b8acdb2a9be1db8a195b2f6a9e6c18d9b754e
+        .package(url: "https://github.com/apple/swift-asn1.git", branch: "main"),
     ],
     targets: [
         .target(
@@ -35,6 +37,6 @@ let package = Package(
             dependencies: ["Bech32"]),
         .testTarget(
             name: "AgeKitTests",
-            dependencies: ["AgeKit"]),
+            dependencies: ["AgeKit", .product(name: "SwiftASN1", package: "swift-asn1")]),
     ]
 )

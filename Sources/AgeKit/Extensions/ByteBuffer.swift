@@ -46,7 +46,7 @@ extension ByteBuffer {
     /// and return the result as `[UInt8]`, or `nil` if `delim` was not found.
     mutating func readBytes(until delim: Character) -> [UInt8]? {
         guard let index = self.indexOf(delim: delim) else {
-            return nil
+            return self.readBytes(length: self.readableBytes)
         }
         return self.readBytes(length: index)
     }
@@ -55,7 +55,7 @@ extension ByteBuffer {
     /// The reader index is moved forward by the length of the string found.
     mutating func readString(until delim: Character) -> String? {
         guard let index = self.indexOf(delim: delim) else {
-            return nil
+            return self.readString(length: self.readableBytes)
         }
         return self.readString(length: index)
     }
