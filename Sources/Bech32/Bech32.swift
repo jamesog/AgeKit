@@ -120,5 +120,6 @@ public func decode(from: String) throws -> (hrp: String, data: Data) {
         throw DecodeError.invalidChecksum
     }
 
-    return (String(data: hrp, encoding: .utf8)!, data[0..<data.count-6])
+    data = try convertBits(data: data[0..<data.count-6], fromBits: 5, toBits: 8, pad: false)
+    return (String(data: hrp, encoding: .utf8)!, data)
 }
