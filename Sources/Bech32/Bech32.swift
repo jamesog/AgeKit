@@ -4,15 +4,15 @@ private let charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l".data(using: .utf8)!
 private let generator: [UInt32] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
 
 enum EncodeError: Error {
-    case InvalidHRP, InvalidCharacter, MixedCase
+    case invalidHRP, invalidCharacter, mixedCase
 }
 
 enum DecodeError: Error {
-    case MixedCase, InvalidPosition, InvalidCharacter, InvalidChecksum
+    case mixedCase, invalidPosition, invalidCharacter, invalidChecksum
 }
 
 enum ConvertError: Error {
-    case InvalidDataRange, IllegalZeroPadding, NonZeroPadding
+    case invalidDataRange, illegalZeroPadding, nonZeroPadding
 }
 
 private func polymod(_ values: Data) -> UInt32 {
@@ -65,32 +65,32 @@ public func encode(to hrp: String, data: Data) throws -> String {
 
 public func decode(from: String) throws -> (hrp: String, data: Data) {
     if from.lowercased() != from && from.uppercased() != from {
-        throw DecodeError.MixedCase
+        throw DecodeError.mixedCase
     }
     let str = from.data(using: .utf8)!
     guard let marker = from.lastIndex(of: "1") else {
-        throw DecodeError.InvalidPosition
+        throw DecodeError.invalidPosition
     }
 
     let pos = from.distance(from: from.startIndex, to: marker)
     if pos < 1 || pos+7 > from.count {
-        throw DecodeError.InvalidPosition
+        throw DecodeError.invalidPosition
     }
     let hrp = str[..<pos]
     for p in hrp {
         if p < 33 || p > 126 {
-            throw DecodeError.InvalidCharacter
+            throw DecodeError.invalidCharacter
         }
     }
 
     var data = Data()
     let s = from.lowercased().data(using: .utf8)!
     for c in s[(pos+1)...] {
-        guard let i = charset.firstIndex(of: c) else { throw DecodeError.InvalidCharacter }
+        guard let i = charset.firstIndex(of: c) else { throw DecodeError.invalidCharacter }
         data.append(UInt8(i))
     }
     if !verifyChecksum(hrp: String(data: hrp, encoding: .utf8)!, data: data) {
-        throw DecodeError.InvalidChecksum
+        throw DecodeError.invalidChecksum
     }
 
     return (String(data: hrp, encoding: .utf8)!, data[0..<data.count-6])
