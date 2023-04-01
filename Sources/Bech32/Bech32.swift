@@ -52,15 +52,42 @@ private func createChecksum(for hrp: String, data: Data) -> Data {
     return data
 }
 
+private func convertBits(data: Data, fromBits: UInt8, toBits: UInt8, pad: Bool) throws -> Data {
+    var ret = Data()
+    var acc = UInt32(0)
+    var bits = UInt8(0)
+    let maxv = UInt8(1<<toBits - 1)
+    for value in data {
+        if value>>fromBits != 0 {
+            throw ConvertError.invalidDataRange
+        }
+        acc = acc<<fromBits | UInt32(value)
+        bits += fromBits
+        while bits >= toBits {
+            bits -= toBits
+            ret.append(UInt8(truncatingIfNeeded: acc>>bits)&maxv)
+        }
+    }
+    if pad, bits > 0 {
+        ret.append(UInt8(truncatingIfNeeded: acc<<(toBits-bits))&maxv)
+    } else if bits >= fromBits {
+        throw ConvertError.illegalZeroPadding
+    }
+    return ret
+}
+
 public func encode(to hrp: String, data: Data) throws -> String {
-    var data = data
-    data.append(createChecksum(for: hrp, data: data))
-    let bytes = Data(data.map { i in
-        charset[charset.index(Data.Index(i), offsetBy: 0)]
-    })
-    let s = String(data: bytes, encoding: .utf8)!
-    let ret = "\(hrp)1\(s)"
-    return hrp.lowercased() == hrp ? ret : ret.uppercased()
+    let values = try convertBits(data: data, fromBits: 8, toBits: 5, pad: true)
+    var ret = hrp.data(using: .utf8)!
+    ret.append("1".data(using: .utf8)!)
+    for i in values {
+        ret.append(charset[Int(i)])
+    }
+    for i in createChecksum(for: hrp, data: values) {
+        ret.append(charset[Int(i)])
+    }
+    let s = String(data: ret, encoding: .utf8)!
+    return hrp.lowercased() == hrp ? s : s.uppercased()
 }
 
 public func decode(from: String) throws -> (hrp: String, data: Data) {
