@@ -1,6 +1,6 @@
 import CryptoKit
-import CryptoSwift
 import Foundation
+import Scrypt
 
 let scryptLabel = "age-encryption.org/v1/scrypt".data(using: .utf8)!
 let scryptSaltSize = 16
@@ -48,19 +48,18 @@ extension Age {
                 throw WrapError.errSecSuccess(errSecSuccess)
             }
 
-            let args = [saltBytes.toBase64(), String(workFactor)]
+            let args = [Data(saltBytes).base64EncodedString(), String(workFactor)]
 
             var salt = scryptLabel
             salt.append(saltBytes, count: saltBytes.count)
 
-            let k = try Scrypt(
+            let k = try scrypt(
                 password: password.bytes,
                 salt: salt.bytes,
-                dkLen: ChaChaPoly.keySize,
+                length: ChaChaPoly.keySize,
                 N: 1<<workFactor,
                 r: 8,
                 p: 1)
-                .calculate()
             let wrappedKey = try aeadEncrypt(key: k, plaintext: fileKey)
 
             return [Age.Stanza(type: "scrypt", args: args, body: wrappedKey)]
@@ -130,14 +129,13 @@ extension Age {
                 }
 
                 salt = Data(scryptLabel.bytes + salt.bytes)
-                let k = try Scrypt(
+                let k = try scrypt(
                     password: Array(password),
                     salt: salt.bytes,
-                    dkLen: ChaChaPoly.keySize,
+                    length: ChaChaPoly.keySize,
                     N: 1<<logN,
                     r: 8,
                     p: 1)
-                    .calculate()
                 let fileKey = try aeadDecrypt(key: k, size: fileKeySize, ciphertext: block.body)
                 return SymmetricKey(data: fileKey)
             }

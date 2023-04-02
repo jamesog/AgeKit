@@ -1,15 +1,6 @@
 {
   "pins" : [
     {
-      "identity" : "cryptoswift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/krzyzanowskim/CryptoSwift",
-      "state" : {
-        "revision" : "19b3c3ceed117c5cc883517c4e658548315ba70b",
-        "version" : "1.6.0"
-      }
-    },
-    {
       "identity" : "swift-asn1",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
@@ -52,6 +43,15 @@
       "state" : {
         "revision" : "45167b8006448c79dda4b7bd604e07a034c15c49",
         "version" : "2.48.0"
+      }
+    },
+    {
+      "identity" : "swift-scrypt",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/greymass/swift-scrypt.git",
+      "state" : {
+        "revision" : "631f21c36bff63e33ad13353ee801b4a032dda15",
+        "version" : "1.0.2"
       }
     }
   ],
