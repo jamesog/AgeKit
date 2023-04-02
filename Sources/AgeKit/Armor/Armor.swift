@@ -18,12 +18,12 @@ extension Armor {
             self.dst = dst
         }
 
-        public mutating func write(_ data: Data) throws -> Int{
+        public mutating func write(_ data: Data) throws -> Int {
             if !started {
                 _ = try dst.write(Armor.header + "\n")
             }
             started = true
-            written += try dst.write(data.base64EncodedString(options: .lineLength64Characters))
+            written += try dst.write(data.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed]))
             return try dst.write("\n")
         }
 

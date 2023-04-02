@@ -13,7 +13,7 @@ final class ArmorTests: XCTestCase {
     }
 
     func armor(size: Int) throws {
-        var out = OutputStream.toMemory()
+        let out = OutputStream.toMemory()
         out.open()
         var w = Armor.Writer(dst: out)
         var plain = [UInt8](repeating: 0, count: size)
@@ -27,7 +27,7 @@ final class ArmorTests: XCTestCase {
         let doc = try PEMDocument(pemString: pem)
         XCTAssertEqual(doc.type, "AGE ENCRYPTED FILE", "unexpected type")
         XCTAssertEqual(doc.derBytes, Data(plain), "PEM decoded value doesn't match")
-//        XCTAssertEqual(pem, PEMDocument(type: "AGE ENCRYPTED FILE", derBytes: doc.derBytes).pemString, "PEM re-encoded value doesn't match")
+        XCTAssertEqual(pem, PEMDocument(type: "AGE ENCRYPTED FILE", derBytes: doc.derBytes).pemString, "PEM re-encoded value doesn't match")
 
         let input = InputStream(data: buf)
         input.open()
