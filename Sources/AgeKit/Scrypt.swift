@@ -19,7 +19,7 @@ extension Age {
         var workFactor: Int
 
         /// Create a new `ScryptRecipient` with the provided password.
-        init?(password: String) {
+        public init?(password: String) {
             if password.isEmpty {
                 return nil
             }
