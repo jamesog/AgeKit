@@ -100,7 +100,7 @@ extension Format {
     }
 
     public static func decodeString(_ s: String) throws -> Data {
-        if #available(macOS 13.0, *) {
+        if #available(macOS 13.0, iOS 16.0, *) {
             if s.contains(["\n", "\r"]) {
                 throw DecodeError.unexpectedNewLineError
             }
