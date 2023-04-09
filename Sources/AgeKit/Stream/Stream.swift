@@ -146,6 +146,11 @@ public struct StreamWriter {
         return bytesWritten
     }
 
+    public mutating func write(_ str: String) throws -> Int {
+        var d = str.data(using: .utf8)!
+        return try write(&d)
+    }
+
     /// Flushes the last chunk. It does not close the underlying `OutputStream`.
     public mutating func close() throws {
         try self.flushChunk(last: true)

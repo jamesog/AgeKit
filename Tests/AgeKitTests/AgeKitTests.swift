@@ -1,7 +1,7 @@
 import XCTest
 @testable import AgeKit
 
-var helloWorld = "Hello, Twitch!".data(using: .utf8)!
+var helloWorld = "Hello, Twitch!"
 
 final class AgeKitTests: XCTestCase {
     func testEncryptDecryptScrypt() throws {
@@ -12,8 +12,7 @@ final class AgeKitTests: XCTestCase {
         var buf = OutputStream.toMemory()
         buf.open()
         var w = try Age.encrypt(dst: &buf, recipients: r)
-        var p = helloWorld
-        _ = try w.write(&p)
+        _ = try w.write(helloWorld)
         try w.close()
         buf.close()
         let bufBytes = buf.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
@@ -27,7 +26,6 @@ final class AgeKitTests: XCTestCase {
         _ = try out.read(&outBytes)
 
         let got = String(data: outBytes, encoding: .utf8)!
-        let want = String(data: helloWorld, encoding: .utf8)!
-        XCTAssertEqual(got, want)
+        XCTAssertEqual(got, helloWorld)
     }
 }
