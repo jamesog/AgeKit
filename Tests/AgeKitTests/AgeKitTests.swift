@@ -4,6 +4,28 @@ import XCTest
 var helloWorld = "Hello, Twitch!"
 
 final class AgeKitTests: XCTestCase {
+
+    func testEncryptDecryptX25519() throws {
+        let a = Age.X25519Identity.generate()
+        let b = Age.X25519Identity.generate()
+        var out = OutputStream.toMemory()
+        out.open()
+       var w = try Age.encrypt(dst: &out, recipients: a.recipient, b.recipient)
+        _ = try w.write(helloWorld)
+        try w.close()
+        out.close()
+        let buf = out.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
+
+        let input = InputStream(data: buf)
+        input.open()
+        var r = try Age.decrypt(src: input, identities: b)
+        var result = Data(repeating: 0, count: 1024)
+        _ = try r.read(&result)
+        input.close()
+        XCTAssertEqual(String(data: result, encoding: .utf8)!, helloWorld)
+    }
+
+
     func testEncryptDecryptScrypt() throws {
         let password = "twitch.tv/filosottile"
 
