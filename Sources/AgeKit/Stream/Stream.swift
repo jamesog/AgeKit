@@ -2,8 +2,7 @@ import Foundation
 import CryptoKit
 
 let chunkSize = 64 * 1024
-let tagSize = 16 // Go: poly1305.TagSize
-let encChunkSize = chunkSize + tagSize
+let encChunkSize = chunkSize + ChaChaPoly.tagSize
 let lastChunkFlag: UInt8 = 0x01
 
 public struct Nonce {
