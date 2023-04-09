@@ -50,4 +50,33 @@ final class AgeKitTests: XCTestCase {
         let got = String(data: outBytes, encoding: .utf8)!
         XCTAssertEqual(got, helloWorld)
     }
+
+    func testParseIdentities() {
+        let tests: [(name: String, wantCount: Int, wantErr: Bool, file: String)] = [
+            (name: "valid", wantCount: 2, wantErr: false, file: """
+# this is a comment
+# AGE-SECRET-KEY-1705XN76M8EYQ8M9PY4E2G3KA8DN7NSCGT3V4HMN20H3GCX4AS6HSSTG8D3
+#
+
+AGE-SECRET-KEY-1D6K0SGAX3NU66R4GYFZY0UQWCLM3UUSF3CXLW4KXZM342WQSJ82QKU59QJ
+AGE-SECRET-KEY-19WUMFE89H3928FRJ5U3JYRNHM6CERQGKSQ584AQ8QY7T7R09D32SWE4DYH
+"""),
+            (name: "invalid", wantCount: 0, wantErr: true, file: """
+AGE-SECRET-KEY-1705XN76M8EYQ8M9PY4E2G3KA8DN7NSCGT3V4HMN20H3GCX4AS6HSSTG8D3
+AGE-SECRET-KEY--1D6K0SGAX3NU66R4GYFZY0UQWCLM3UUSF3CXLW4KXZM342WQSJ82QKU59Q
+""")
+        ]
+
+        for test in tests {
+            print(test.name)
+            let input = InputStream(data: test.file.data(using: .utf8)!)
+            input.open()
+            if test.wantErr {
+                XCTAssertThrowsError(try Age.parseIdentities(input: input))
+                continue
+            }
+            let got = try! Age.parseIdentities(input: input)
+            XCTAssertEqual(got.count, test.wantCount, "parseIdentities returned \(got.count), want \(test.wantCount)")
+        }
+    }
 }
