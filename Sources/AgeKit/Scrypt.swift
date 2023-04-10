@@ -1,4 +1,5 @@
 import CryptoKit
+import ExtrasBase64
 import Foundation
 import Scrypt
 
@@ -48,7 +49,8 @@ extension Age {
                 throw WrapError.errSecSuccess(errSecSuccess)
             }
 
-            let args = [Data(saltBytes).base64EncodedString(), String(workFactor)]
+            let saltEncoded = Base64.encodeString(bytes: saltBytes, options: .omitPaddingCharacter)
+            let args = [saltEncoded, String(workFactor)]
 
             var salt = scryptLabel
             salt.append(saltBytes, count: saltBytes.count)
