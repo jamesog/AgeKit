@@ -14,7 +14,7 @@ extension Armor {
         private var started = false
         private var written = 0
 
-        init(dst: OutputStream) {
+        public init(dst: OutputStream) {
             self.dst = dst
         }
 
