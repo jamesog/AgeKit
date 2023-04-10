@@ -2,8 +2,8 @@ import Foundation
 import NIOCore
 
 public enum Armor {
-    private static let header = "-----BEGIN AGE ENCRYPTED FILE-----"
-    private static let footer = "-----END AGE ENCRYPTED FILE-----"
+    public static let header = "-----BEGIN AGE ENCRYPTED FILE-----"
+    public static let footer = "-----END AGE ENCRYPTED FILE-----"
 }
 
 // MARK: - Writer
