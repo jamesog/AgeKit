@@ -27,7 +27,7 @@ extension Age {
         }
 
         /// Create an X25519Recipient from a Bech32-encoded public key with the "age1" prefix.
-        init(_ string: String) throws {
+        public init(_ string: String) throws {
             let (hrp, data) = try Bech32.decode(from: string)
             if hrp != "age" {
                 throw Error.invalidType
