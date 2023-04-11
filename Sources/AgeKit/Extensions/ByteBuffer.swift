@@ -7,21 +7,18 @@ extension ByteBuffer {
     /// The entire `InputStream` is consumed into the buffer.
     init(_ input: InputStream) {
         let bufSize = 4096
-        var data = Data()
+        self = ByteBufferAllocator().buffer(capacity: bufSize)
         var buf = [UInt8](repeating: 0, count: bufSize)
-        var bytes = 0
         while input.hasBytesAvailable {
             let result = input.read(&buf, maxLength: bufSize)
-            bytes += result
             if result < 0 {
                 break
             }
             if result == 0 {
                 break
             }
-            data.append(buf, count: result)
+            self.writeBytes(buf[..<result])
         }
-        self = ByteBufferAllocator().buffer(bytes: data)
     }
 
     mutating private func indexOf(delim: Character) -> Array<UInt8>.Index? {
