@@ -34,7 +34,7 @@ final class ArmorTests: XCTestCase {
         var readBuf = [UInt8]()
         readBuf.reserveCapacity(buf.count)
         var r = Armor.Reader(src: input)
-        _ = r.read(&readBuf)
+        _ = try r.read(&readBuf)
         input.close()
         XCTAssertEqual(readBuf, plain)
     }

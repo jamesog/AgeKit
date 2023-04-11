@@ -6,6 +6,14 @@ public enum Armor {
     public static let footer = "-----END AGE ENCRYPTED FILE-----"
 }
 
+public enum ArmorError: Error {
+    case writerAlreadyClosed
+    case invalidHeader(String)
+    case trailingDataAfterArmor
+    case tooMuchTrailingWhitespace
+    case base64DecodeError
+}
+
 // MARK: - Writer
 
 extension Armor {
@@ -23,18 +31,17 @@ extension Armor {
                 _ = try dst.write(Armor.header + "\n")
             }
             started = true
-            written += try dst.write(data.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed]))
-            return try dst.write("\n")
+            written += try dst.write(
+                data.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed])
+            )
+            written += try dst.write("\n")
+            return written
         }
 
         public func close() throws {
             if dst.streamStatus == .closed {
-                // TODO: throw already closed
+                throw ArmorError.writerAlreadyClosed
             }
-//            var footer = Armor.footer + "\n"
-//            if written % Format.columnsPerLine == 0 {
-//                footer = "\n" + Armor.footer
-//            }
             _ = try dst.write(Armor.footer)
         }
     }
@@ -47,22 +54,22 @@ extension Armor {
         private var src: ByteBuffer
         private var encoded = ""
         private var started = false
+        private let maxWhitespace = 1024
 
-        init(src: InputStream) {
+        public init(src: InputStream) {
             // FIXME: Consuming the entire input is probably bad, but InputStream is too hard to work with.
             self.src = ByteBuffer(src)
         }
 
-        public mutating func read(_ buffer: inout [UInt8]) -> Int {
+        public mutating func read(_ buffer: inout [UInt8]) throws -> Int {
             var read = 0
             if !started {
-                debugPrint(#file, "Reading header line")
                 guard let line = src.readString(until: "\n") else {
                     return -1
                 }
                 let header = line.trimmingCharacters(in: ["\n"])
                 if header != Armor.header {
-                    debugPrint(#file, "Header is incorrect: \(line)")
+                    throw ArmorError.invalidHeader(header)
                 }
                 started = true
             }
@@ -77,8 +84,17 @@ extension Armor {
                 encoded += line
                 read += line.count
             }
+            if src.readableBytes > 0 {
+                let trailing = src.readString(length: min(src.readableBytes, maxWhitespace))
+                guard let trailing, trailing.trimmingCharacters(in: .whitespaces).isEmpty else {
+                    throw ArmorError.trailingDataAfterArmor
+                }
+                guard trailing.count < maxWhitespace else {
+                    throw ArmorError.tooMuchTrailingWhitespace
+                }
+            }
             guard let enc = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters) else {
-                return -1
+                throw ArmorError.base64DecodeError
             }
 
             buffer.append(contentsOf: enc)
