@@ -37,6 +37,9 @@ let package = Package(
             dependencies: ["Bech32"]),
         .testTarget(
             name: "AgeKitTests",
-            dependencies: ["AgeKit", .product(name: "SwiftASN1", package: "swift-asn1")]),
+            dependencies: ["AgeKit", .product(name: "SwiftASN1", package: "swift-asn1")],
+            exclude: [
+                "StreamTests/StreamTests.swift.gyb",
+            ]),
     ]
 )
